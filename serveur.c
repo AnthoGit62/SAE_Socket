@@ -1,3 +1,5 @@
+// Branche de dev louis, code sale mais qui marche
+
 #include <stdio.h>
 #include <stdlib.h> /* pour exit */
 #include <unistd.h> /* pour read, write, close, sleep */
@@ -6,35 +8,81 @@
 #include <string.h> /* pour memset */
 #include <netinet/in.h> /* pour struct sockaddr_in */
 #include <arpa/inet.h> /* pour htons et inet_aton */
+#include <time.h>
 
-#define PORT 5000 //(ports >= 5000 réservés pour usage explicite)
-
+#define PORT 5000
 #define LG_MESSAGE 256
 
-void lire_heure(char* heure) {
-    FILE *fpipe;
-    fpipe = popen("date '+%X'", "r");
-    if (fpipe == NULL) {
-        perror("popen");
-        exit(-1);
-    }
-    fgets(heure, LG_MESSAGE, fpipe);
-    pclose(fpipe);
+void init_grille(char grille[9]){
+	for(int i = 0 ; i < 9 ; i++){
+			grille[i] = ' ' ;
+		}
 }
 
-void lire_date(char* date) {
-    FILE *fpipe;
-    fpipe = popen("date '+%A %d %B %Y'", "r");
-    if (fpipe == NULL) {
-        perror("popen");
-        exit(-1);
-    }
-    fgets(date, LG_MESSAGE, fpipe);
-    pclose(fpipe);
+void affiche(char grille[9]){
+	printf("~~~~~~~~~~~~~~~~~~~~\n");
+	printf(" %c | %c | %c\n" , grille[0], grille[1], grille[2]);
+	printf("------------\n");
+	printf(" %c | %c | %c\n" , grille[3], grille[4], grille[5]);
+	printf("------------\n");
+	printf(" %c | %c | %c\n" , grille[6], grille[7], grille[8]);
 }
+
+void prendre_case(char grille[9], char *messageRecu) {
+    int caseNum;
+
+    sscanf(messageRecu, "%d", &caseNum);
+
+	if(grille[caseNum - 1] == ' '){
+		switch (caseNum) {
+			case 1:  
+				grille[0] = 'X'; 
+				break;
+			case 2:  
+				grille[1] = 'X'; 
+				break;
+			case 3:  
+				grille[2] = 'X'; 
+				break;
+			case 4:  
+				grille[3] = 'X'; 
+				break ; 
+			case 5:  
+				grille[4] = 'X'; 
+				break;
+			case 6:  
+				grille[5] = 'X'; 
+				break;
+			case 7:  
+				grille[6] = 'X'; 
+				break;
+			case 8:  
+				grille[7] = 'X'; 
+				break;
+			case 9:  
+				grille[8] = 'X'; 
+				break;
+			default:
+				printf("Option invalide.\n");
+				return;
+    	}
+	}
+}
+
+int bot_player(char grille[9]) {
+	for(int i = 0 ; i < 8 ; i++){
+		if(grille[i] == ' '){
+			grille[i] = 'O';
+			return 0;
+		}
+	}
+	return 1 ;
+}
+
 
 
 int main(int argc, char *argv[]){
+
 	int socketEcoute;
 
 	struct sockaddr_in pointDeRencontreLocal;
@@ -42,26 +90,35 @@ int main(int argc, char *argv[]){
 
 	int socketDialogue;
 	struct sockaddr_in pointDeRencontreDistant;
-	char messageRecu[LG_MESSAGE]; /* le message de la couche Application ! */
+
+	char messageRecu[LG_MESSAGE];
+	char messageEnvoye[LG_MESSAGE];
+
 	int ecrits, lus; /* nb d’octets ecrits et lus */
 	int retour;
 
-	// Crée un socket de communication
-	socketEcoute = socket(AF_INET, SOCK_STREAM, 0); 
+	char grille[9] ;
+
+
+// Crée un socket de communication
+
+	socketEcoute = socket(AF_INET, SOCK_STREAM, 0);
+
 	// Teste la valeur renvoyée par l’appel système socket() 
 	if(socketEcoute < 0){
-		perror("socket"); // Affiche le message d’erreur 
-	exit(-1); // On sort en indiquant un code erreur
+		perror("socket");
+		exit(-1);
 	}
-	printf("Socket créée avec succès ! (%d)\n", socketEcoute); // On prépare l’adresse d’attachement locale
-	//setsockopt()
 
+	printf("Socket créée avec succès ! (%d)\n", socketEcoute); // On prépare l’adresse d’attachement locale
 
 	// Remplissage de sockaddrDistant (structure sockaddr_in identifiant le point d'écoute local)
 	longueurAdresse = sizeof(pointDeRencontreLocal);
+
 	// memset sert à faire une copie d'un octet n fois à partir d'une adresse mémoire donnée
 	// ici l'octet 0 est recopié longueurAdresse fois à partir de l'adresse &pointDeRencontreLocal
-	memset(&pointDeRencontreLocal, 0x00, longueurAdresse); pointDeRencontreLocal.sin_family = PF_INET;
+	memset(&pointDeRencontreLocal, 0x00, longueurAdresse); 
+	pointDeRencontreLocal.sin_family = PF_INET;
 	pointDeRencontreLocal.sin_addr.s_addr = htonl(INADDR_ANY); // attaché à toutes les interfaces locales disponibles
 	pointDeRencontreLocal.sin_port = htons(PORT); // = 5000 ou plus
 	
@@ -78,54 +135,55 @@ int main(int argc, char *argv[]){
    		exit(-3);
 	}
 	printf("Socket placée en écoute passive ...\n");
-	
-	// boucle d’attente de connexion : en théorie, un serveur attend indéfiniment ! 
-	while (1) {
-		memset(messageRecu, 0, LG_MESSAGE * sizeof(char));
+	 
+// boucle d’attente de connexion : en théorie, un serveur attend indéfiniment ! 
+
+	while(1){
+
+		memset(messageRecu, 'a', LG_MESSAGE*sizeof(char));
 		printf("Attente d’une demande de connexion (quitter avec Ctrl-C)\n\n");
-
+		
+		// c’est un appel bloquant
 		socketDialogue = accept(socketEcoute, (struct sockaddr *)&pointDeRencontreDistant, &longueurAdresse);
+
 		if (socketDialogue < 0) {
-			perror("accept");
+   			perror("accept");
 			close(socketDialogue);
-			close(socketEcoute);
-			exit(-4);
+   			close(socketEcoute);
+   			exit(-4);
 		}
 
-		lus = recv(socketDialogue, messageRecu, LG_MESSAGE * sizeof(char), 0);
-		switch (lus) {
-			case -1:
-				perror("read");
-				close(socketDialogue);
-				exit(-5);
-			case 0:
-				fprintf(stderr, "La socket a été fermée par le client !\n\n");
-				close(socketDialogue);
-				return 0;
-			default:
-				printf("Message reçu : %s (%d octets)\n\n", messageRecu, lus);
+		memset(messageEnvoye, 0x00, LG_MESSAGE);
+		memset(messageRecu, 0x00, LG_MESSAGE);
+		init_grille(grille) ;
+
+	// Jeu :
+		while(1){
+			// Pour envoyer
+			memset(messageEnvoye, 0x00, LG_MESSAGE);
+			snprintf(messageEnvoye, LG_MESSAGE, "Numéro de la case que vous souhaitez prendre : (1 à 9) :");
+			send(socketDialogue, messageEnvoye, strlen(messageEnvoye) + 1, 0);
+
+			// Pour recup
+			memset(messageRecu, 0x00, LG_MESSAGE);
+			lus = recv(socketDialogue, messageRecu, LG_MESSAGE, 0);
+
+			// On verifie , on claim la case et on envoie au joueur
+			if (lus > 0) {
+				printf("Message reçu : %s\n", messageRecu);
+				prendre_case(grille, messageRecu);
+				affiche(grille);
+				send(socketDialogue, grille, sizeof(grille), 0);
+			}
+
+			// au tour du serveur de jouer
+			bot_player(grille);
+			affiche(grille);
+			send(socketDialogue, grille, sizeof(grille), 0);
 		}
 
-		// Réponse selon le message reçu
-		if (strncmp(messageRecu, "heure", 5) == 0) {
-			char heure[LG_MESSAGE];
-			lire_heure(heure);
-			send(socketDialogue, heure, strlen(heure) + 1, 0);
-			printf("Heure envoyée au client : %s\n", heure);
-		} else if (strncmp(messageRecu, "date", 4) == 0) {
-			char date[LG_MESSAGE];
-			lire_date(date);
-			send(socketDialogue, date, strlen(date) + 1, 0);
-			printf("Date envoyée au client : %s\n", date);
-		} else {
-			char erreur[] = "Commande non reconnue. Veuillez envoyer 'heure' ou 'date'.";
-			send(socketDialogue, erreur, strlen(erreur) + 1, 0);
-			printf("Commande inconnue envoyée au client.\n");
-		}
-
-		close(socketDialogue);
+        close(socketDialogue);
 	}
-
 	// On ferme la ressource avant de quitter
    	close(socketEcoute);
 	return 0; 
