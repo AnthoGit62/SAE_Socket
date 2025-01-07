@@ -1,3 +1,9 @@
+/* 
+	##################################################################
+	### Project Socket by PREVOST Louis | SEYS Anthony | LIM Julie ### 
+	##################################################################
+*/
+
 #include <stdio.h>
 #include <stdlib.h> /* pour exit */
 #include <unistd.h> /* pour read, write, close, sleep */
@@ -65,33 +71,59 @@ int main(int argc, char *argv[]){
 	}
 	printf("Connexion au serveur %s:%d réussie!\n",ip_dest,port_dest);
 
-	printf("Tapez 'heure' pour recevoir l'heure ou 'date' pour recevoir la date : ");
-	fgets(buffer, LG_MESSAGE, stdin);
-	buffer[strcspn(buffer, "\n")] = '\0'; 
 
- 	// Envoi du message
-	//switch(nb = write(descripteurSocket, buffer, strlen(buffer))){
-	switch(nb = send(descripteurSocket, buffer, strlen(buffer)+1,0)){
-		case -1 : /* une erreur ! */
-     			perror("Erreur en écriture...");
-		     	close(descripteurSocket);
-		     	exit(-3);
-		case 0 : /* le socket est fermée */
-			fprintf(stderr, "Le socket a été fermée par le serveur !\n\n");
+	/* début boucle */
+
+
+	while(1)
+	{
+		printf("Choisissez l'une des options suivantes : \n");
+		printf("° Tapez 'heure', pour avoir l'heure actuelle. \n");
+		printf("° Tapez 'date', pour avoir la date du jour. \n");
+		printf("° Tapez 'quit', si vous souhaitez arrêter l'applications ! \n");
+		printf("\n> ");
+		fgets(buffer, LG_MESSAGE, stdin);
+		buffer[strcspn(buffer, "\n")] = '\0'; 
+
+		// Envoi du message
+		//switch(nb = write(descripteurSocket, buffer, strlen(buffer))){
+		switch(nb = send(descripteurSocket, buffer, strlen(buffer)+1,0)){
+			case -1 : /* une erreur ! */
+					perror("Erreur en écriture...");
+					close(descripteurSocket);
+					exit(-3);
+			case 0 : /* le socket est fermée */
+				fprintf(stderr, "Le socket a été fermée par le serveur !\n\n");
+				return 0;
+			default: /* envoi de n octets */
+				printf("Message %s envoyé! (%d octets)\n\n", buffer, nb);
+		}
+		nb = recv(descripteurSocket, buffer, LG_MESSAGE, 0);
+		if(nb < 0){
+			perror("Erreur de réception...");
+			close(descripteurSocket);
+			exit(-4);
+		}
+		printf("Réponse du serveur : %s\n", buffer);
+
+		if(strcmp(buffer, "shutdown") == 0) {
+			// On ferme la ressource avant de quitter
+			close(descripteurSocket);
 			return 0;
-		default: /* envoi de n octets */
-			printf("Message %s envoyé! (%d octets)\n\n", buffer, nb);
+		} 
+		
 	}
-	nb = recv(descripteurSocket, buffer, LG_MESSAGE, 0);
-    if(nb < 0){
-        perror("Erreur de réception...");
-        close(descripteurSocket);
-        exit(-4);
-    }
-    printf("Réponse du serveur : %s\n", buffer);
+	
 
-	// On ferme la ressource avant de quitter
-	close(descripteurSocket);
+/* fin boucle */
 
-	return 0;
+
+
+
+
+
+
+
+
+
 }
