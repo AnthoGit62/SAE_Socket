@@ -12,6 +12,7 @@
 #include <string.h>		/* pour memset */
 #include <netinet/in.h> /* pour struct sockaddr_in */
 #include <arpa/inet.h>	/* pour htons et inet_aton */
+#include <time.h>
 
 #define PORT 5000 //(ports >= 5000 réservés pour usage explicite)
 
@@ -74,14 +75,55 @@ void prendre_case(char grille[9], char *messageRecu) {
 }
 
 int bot_player(char grille[9]) {
-	for(int i = 0 ; i < 8 ; i++){
-		if(grille[i] == ' '){
-			grille[i] = 'O';
-			return 0;
-		}
+	int cases_vides[9];
+    int total = 0;
+
+    for (int i = 0 ; i < 9 ; i++) {
+        if (grille[i] == ' ') {
+            cases_vides[total] = i ;
+            total++;
+        }
+    }
+
+    if (total == 0) {
+        printf("Pas de cases vides disponibles.\n");
+        return 0;
+    }
+	else {
+    	srand(time(NULL));
+
+    	int choix = cases_vides[rand() % total];
+
+    	grille[choix] = 'O';
 	}
-	return 1 ;
 }
+
+char win(char grille[9]) {
+    // Tableau des combinaisons gagnantes
+    int combinaisons[8][3] = {
+        {0, 1, 2}, // Ligne supérieure
+        {3, 4, 5}, // Ligne centrale
+        {6, 7, 8}, // Ligne inférieure
+        {0, 3, 6}, // Colonne gauche
+        {1, 4, 7}, // Colonne centrale
+        {2, 5, 8}, // Colonne droite
+        {0, 4, 8}, // Diagonale principale
+        {2, 4, 6}  // Diagonale secondaire
+    };
+
+    // Vérification des combinaisons gagnantes
+    for (int i = 0; i < 8; i++) {
+        if (grille[combinaisons[i][0]] == grille[combinaisons[i][1]] &&
+            grille[combinaisons[i][1]] == grille[combinaisons[i][2]] &&
+            grille[combinaisons[i][0]] != ' ') {
+            return grille[combinaisons[i][0]]; // Retourne 'X' ou 'O'
+        }
+    }
+
+    // Aucun gagnant, retourne 'R' pour indiquer une égalité ou partie en cours
+    return 'R';
+}
+
 
 void creation_socket(int *socketEcoute)
 {
@@ -141,6 +183,10 @@ int main(int argc, char *argv[])
 	int ecrits, lus;			  /* nb d’octets ecrits et lus */
 	int retour;
 
+	char* winX = "Le client à gagné";
+	char* winO = "Le bot à gagné";
+	char* winR = "Match Nul";
+
 	char grille[9] ;
 	init_grille(grille);
 
@@ -188,7 +234,7 @@ int main(int argc, char *argv[])
 			{
 				send(socketDialogue, "Start", strlen("Start") + 1, 0);
 				while (1){
-
+					printf("here\n");
 					// Pour envoyer
 					memset(messageEnvoye, 0x00, LG_MESSAGE);
 					snprintf(messageEnvoye, LG_MESSAGE, "Numéro de la case que vous souhaitez prendre : (1 à 9) :");
@@ -202,12 +248,27 @@ int main(int argc, char *argv[])
 					if (lus > 0) {
 						printf("Message reçu : %s\n", messageRecu);
 						prendre_case(grille, messageRecu);
+						if(win(grille) == 'X'){
+							send(socketDialogue,winX, strlen(winX) + 1, 0);
+						} else if (win(grille) == 'O') {
+							send(socketDialogue,winO, strlen(winO) + 1, 0);
+						}  else if (win(grille) == 'R') {
+							send(socketDialogue, winR, strlen(winR) + 1, 0);
+						}
+
 						affiche(grille);
 						send(socketDialogue, grille, sizeof(grille), 0);
 					}
 
 					// au tour du serveur de jouer
 					bot_player(grille);
+					if(win(grille) == 'X'){
+							send(socketDialogue,winX, strlen(winX) + 1, 0);
+						} else if (win(grille) == 'O') {
+							send(socketDialogue,winO, strlen(winO) + 1, 0);
+						}  else if (win(grille) == 'R') {
+							send(socketDialogue, winR, strlen(winR) + 1, 0);
+						}
 					affiche(grille);
 					send(socketDialogue, grille, sizeof(grille), 0);
 				}

@@ -159,8 +159,10 @@ int main(int argc, char *argv[]){
 
 				// Pour recevoir et afficher
 				memset(buffer, 0x00, LG_MESSAGE);
+				
 				recv(descripteurSocket, buffer, 9, 0);
 				affiche(buffer);
+				
 
 				printf("L'ordinateur va jouer :\n");
 
