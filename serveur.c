@@ -98,30 +98,42 @@ int bot_player(char grille[9]) {
 	}
 }
 
-char win(char grille[9]) {
-    // Tableau des combinaisons gagnantes
-    int combinaisons[8][3] = {
-        {0, 1, 2}, // Ligne supérieure
-        {3, 4, 5}, // Ligne centrale
-        {6, 7, 8}, // Ligne inférieure
-        {0, 3, 6}, // Colonne gauche
-        {1, 4, 7}, // Colonne centrale
-        {2, 5, 8}, // Colonne droite
-        {0, 4, 8}, // Diagonale principale
-        {2, 4, 6}  // Diagonale secondaire
-    };
+char win(char grille[9])
+{
+	// Tableau des combinaisons gagnantes
+	int combinaisons[8][3] = {
+		{0, 1, 2}, // Ligne supérieure
+		{3, 4, 5}, // Ligne centrale
+		{6, 7, 8}, // Ligne inférieure
+		{0, 3, 6}, // Colonne gauche
+		{1, 4, 7}, // Colonne centrale
+		{2, 5, 8}, // Colonne droite
+		{0, 4, 8}, // Diagonale principale
+		{2, 4, 6}  // Diagonale secondaire
+	};
 
-    // Vérification des combinaisons gagnantes
-    for (int i = 0; i < 8; i++) {
-        if (grille[combinaisons[i][0]] == grille[combinaisons[i][1]] &&
-            grille[combinaisons[i][1]] == grille[combinaisons[i][2]] &&
-            grille[combinaisons[i][0]] != ' ') {
-            return grille[combinaisons[i][0]]; // Retourne 'X' ou 'O'
-        }
-    }
+	// Vérification des combinaisons gagnantes
+	for (int i = 0; i < 8; i++)
+	{
+		if (grille[combinaisons[i][0]] == grille[combinaisons[i][1]] &&
+			grille[combinaisons[i][1]] == grille[combinaisons[i][2]] &&
+			grille[combinaisons[i][0]] != ' ')
+		{
+			return grille[combinaisons[i][0]]; // Retourne 'X' ou 'O'
+		}
+	}
 
-    // Aucun gagnant, retourne 'R' pour indiquer une égalité ou partie en cours
-    return 'R';
+	// Vérification si toutes les cases sont prises
+	for (int i = 0; i < 9; i++)
+	{
+		if (grille[i] == ' ')
+		{
+			return 'C'; // Partie en cours
+		}
+	}
+
+	// Aucun gagnant et grille pleine
+	return 'R'; // Match nul
 }
 
 
@@ -139,7 +151,6 @@ int main(int argc, char *argv[]){
 	int retour;
 
 	char grille[9] ;
-	init_grille(grille) ;
 
 	// Crée un socket de communication
 	socketEcoute = socket(AF_INET, SOCK_STREAM, 0); 
@@ -187,31 +198,103 @@ int main(int argc, char *argv[]){
    			close(socketEcoute);
    			exit(-4);
 		}
+
+		char finJeu = 'N';
+
+		init_grille(grille) ;
 		
-		while (1){
+		while (finJeu != 'Y'){
 
-					// Pour envoyer
+			// Pour envoyer
+			memset(messageEnvoye, 0x00, LG_MESSAGE);
+			snprintf(messageEnvoye, LG_MESSAGE, "Numéro de la case que vous souhaitez prendre : (1 à 9) :");
+			ecrits = send(socketDialogue, messageEnvoye, strlen(messageEnvoye) + 1, 0);
+
+			// Pour recup
+			memset(messageRecu, 0x00, LG_MESSAGE);
+			lus = recv(socketDialogue, messageRecu, LG_MESSAGE, 0);
+
+			// On verifie , on claim la case et on envoie au joueur
+			if (lus > 0) {
+				printf("Message reçu : %s\n", messageRecu);
+				prendre_case(grille, messageRecu);
+				affiche(grille);
+				send(socketDialogue, grille, sizeof(grille), 0);
+			}
+			else if (lus == 0) {
+				printf("Le client s'est déconnecté.\n");
+				break; // Sortir de la boucle et fermer le socket de dialogue
+        	} 
+			else if (lus < 0) {
+				perror("Erreur lors de la réception du message");
+				break; // Sortir de la boucle et fermer le socket de dialogue
+        	}
+
+			char winner = win(grille);
+
+				if (winner == 'X')
+				{
 					memset(messageEnvoye, 0x00, LG_MESSAGE);
-					snprintf(messageEnvoye, LG_MESSAGE, "Numéro de la case que vous souhaitez prendre : (1 à 9) :");
-					send(socketDialogue, messageEnvoye, strlen(messageEnvoye) + 1, 0);
-
-					// Pour recup
-					memset(messageRecu, 0x00, LG_MESSAGE);
-					lus = recv(socketDialogue, messageRecu, LG_MESSAGE, 0);
-
-					// On verifie , on claim la case et on envoie au joueur
-					if (lus > 0) {
-						printf("Message reçu : %s\n", messageRecu);
-						prendre_case(grille, messageRecu);
-						affiche(grille);
-						send(socketDialogue, grille, sizeof(grille), 0);
-					}
-
-					// au tour du serveur de jouer
-					bot_player(grille);
-					affiche(grille);
-					send(socketDialogue, grille, sizeof(grille), 0);
+					snprintf(messageEnvoye, LG_MESSAGE, "Client, vainqueur !\n");
+					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
+					finJeu = 'Y';
 				}
+				else if (winner == 'O')
+				{
+					memset(messageEnvoye, 0x00, LG_MESSAGE);
+					snprintf(messageEnvoye, LG_MESSAGE, "Bot, vainqueur !\n");
+					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
+					finJeu = 'Y';
+				}
+				else if (winner == 'R')
+				{
+					memset(messageEnvoye, 0x00, LG_MESSAGE);
+					snprintf(messageEnvoye, LG_MESSAGE, "Match nul !\n");
+					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
+					finJeu = 'Y';
+				}
+				else if (winner == 'C')
+				{
+					memset(messageEnvoye, 0x00, LG_MESSAGE);
+					snprintf(messageEnvoye, LG_MESSAGE, "Tours suivant :\n");
+					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
+				}
+
+			// au tour du serveur de jouer
+			bot_player(grille);
+			affiche(grille);
+			send(socketDialogue, grille, sizeof(grille), 0);
+
+			winner = win(grille);
+
+				if (winner == 'X')
+				{
+					memset(messageEnvoye, 0x00, LG_MESSAGE);
+					snprintf(messageEnvoye, LG_MESSAGE, "Client, vainqueur !\n");
+					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
+					finJeu = 'Y';
+				}
+				else if (winner == 'O')
+				{
+					memset(messageEnvoye, 0x00, LG_MESSAGE);
+					snprintf(messageEnvoye, LG_MESSAGE, "Bot, vainqueur !\n");
+					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
+					finJeu = 'Y';
+				}
+				else if (winner == 'R')
+				{
+					memset(messageEnvoye, 0x00, LG_MESSAGE);
+					snprintf(messageEnvoye, LG_MESSAGE, "Match nul !\n");
+					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
+					finJeu = 'Y';
+				}
+				else if (winner == 'C')
+				{
+					memset(messageEnvoye, 0x00, LG_MESSAGE);
+					snprintf(messageEnvoye, LG_MESSAGE, "Tours suivant :\n");
+					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
+				}
+		}
 
 	}
 	// On ferme la ressource avant de quitter

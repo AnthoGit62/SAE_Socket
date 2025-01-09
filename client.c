@@ -81,42 +81,48 @@ int main(int argc, char *argv[]){
 	printf("Connexion au serveur %s:%d réussie!\n",ip_dest,port_dest);
 
  	while(1){
-				printf("A votre tour :\n");
+		// Pour recevoir et enregistrer le choix
+		memset(buffer, 0x00, LG_MESSAGE);
+		recv(descripteurSocket, buffer, LG_MESSAGE, 0);
+		printf("%s",buffer);
 
-				// Pour recevoir et enregistrer le choix
-				memset(buffer, 0x00, LG_MESSAGE);
-				recv(descripteurSocket, buffer, LG_MESSAGE, 0);
-				printf("%s",buffer);
+		int choix;
+		scanf("%d", &choix);
 
-				int choix;
-				scanf("%d", &choix);
+		// Pour transformer choix en texte
+		sprintf(buffer, "%d", choix) ;
 
-				// Pour transformer choix en texte
-				sprintf(buffer, "%d", choix) ;
+		//Envoie et check les erreurs
+		switch(nb = send(descripteurSocket, buffer, strlen(buffer) + 1, 0)){
+			case -1 :
+					perror("Erreur en écriture...");
+					close(descripteurSocket);
+					exit(-3);
+			case 0 :
+				fprintf(stderr, "Le socket a été fermée par le serveur !\n\n");
+				return 0;
+		}
 
-				//Envoie et check les erreurs
-				switch(nb = send(descripteurSocket, buffer, strlen(buffer) + 1, 0)){
-					case -1 :
-							perror("Erreur en écriture...");
-							close(descripteurSocket);
-							exit(-3);
-					case 0 :
-						fprintf(stderr, "Le socket a été fermée par le serveur !\n\n");
-						return 0;
-				}
+		// Pour recevoir et afficher
+		memset(buffer, 0x00, LG_MESSAGE);
+		recv(descripteurSocket, buffer, 9, 0);
+		affiche(buffer);
 
-				// Pour recevoir et afficher
-				memset(buffer, 0x00, LG_MESSAGE);
-				recv(descripteurSocket, buffer, 9, 0);
-				affiche(buffer);
+		// Afficher le gagnant
+		memset(buffer, 0x00, LG_MESSAGE);
+		recv(descripteurSocket, buffer, LG_MESSAGE,0);
+		printf("%s", buffer);
 
-				printf("L'ordinateur va jouer :\n");
+		// Pour recevoir et afficher le jeu du serveur
+		memset(buffer, 0x00, LG_MESSAGE);
+		recv(descripteurSocket, buffer, 9, 0);
+		affiche(buffer);
 
-				// Pour recevoir et afficher
-				memset(buffer, 0x00, LG_MESSAGE);
-				recv(descripteurSocket, buffer, 9, 0);
-				affiche(buffer);
-			}
+		// Afficher le gagnant
+		memset(buffer, 0x00, LG_MESSAGE);
+		recv(descripteurSocket, buffer, LG_MESSAGE,0);
+		printf("%s", buffer);
+	}
 
 	// On ferme la ressource avant de quitter
 	close(descripteurSocket);
