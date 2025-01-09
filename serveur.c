@@ -199,8 +199,6 @@ int main(int argc, char *argv[]){
    			exit(-4);
 		}
 
-		char finJeu = 'N';
-
 		init_grille(grille) ;
 		
 		while (1){
@@ -237,21 +235,21 @@ int main(int argc, char *argv[]){
 					memset(messageEnvoye, 0x00, LG_MESSAGE);
 					snprintf(messageEnvoye, LG_MESSAGE, "Client, vainqueur !\n");
 					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
-					finJeu = 'Y';
+					break;
 				}
 				else if (winner == 'O')
 				{
 					memset(messageEnvoye, 0x00, LG_MESSAGE);
 					snprintf(messageEnvoye, LG_MESSAGE, "Bot, vainqueur !\n");
 					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
-					finJeu = 'Y';
+					break;
 				}
 				else if (winner == 'R')
 				{
 					memset(messageEnvoye, 0x00, LG_MESSAGE);
 					snprintf(messageEnvoye, LG_MESSAGE, "Match nul !\n");
 					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
-					finJeu = 'Y';
+					break;
 				}
 				else if (winner == 'C')
 				{
@@ -272,21 +270,21 @@ int main(int argc, char *argv[]){
 					memset(messageEnvoye, 0x00, LG_MESSAGE);
 					snprintf(messageEnvoye, LG_MESSAGE, "Client, vainqueur !\n");
 					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
-					finJeu = 'Y';
+					break;
 				}
 				else if (winner == 'O')
 				{
 					memset(messageEnvoye, 0x00, LG_MESSAGE);
 					snprintf(messageEnvoye, LG_MESSAGE, "Bot, vainqueur !\n");
 					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
-					finJeu = 'Y';
+					break;
 				}
 				else if (winner == 'R')
 				{
 					memset(messageEnvoye, 0x00, LG_MESSAGE);
 					snprintf(messageEnvoye, LG_MESSAGE, "Match nul !\n");
 					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
-					finJeu = 'Y';
+					break;
 				}
 				else if (winner == 'C')
 				{
