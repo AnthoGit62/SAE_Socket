@@ -1,6 +1,6 @@
 # DOC du projet T3N Socket
 
-#### Par PREVOST Louis, SEYS Anthony & LIM Julie
+#### Par PREVOST Louis & SEYS Anthony & LIM Julie
 
 #### Projet Universitaire - Janvier 2025
 
