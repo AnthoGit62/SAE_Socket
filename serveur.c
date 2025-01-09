@@ -203,7 +203,7 @@ int main(int argc, char *argv[]){
 
 		init_grille(grille) ;
 		
-		while (finJeu != 'Y'){
+		while (1){
 
 			// Pour envoyer
 			memset(messageEnvoye, 0x00, LG_MESSAGE);
