@@ -1,4 +1,4 @@
-# DOC du projet T3N Socket
+# DOC du projet T3N Socket V2
 
 #### Par PREVOST Louis & SEYS Anthony & LIM Julie
 
@@ -31,7 +31,7 @@ Exécutez d'abord le serveur dans un terminal ou un compilateur dédié :
 ./serveur
 ```
 
-Ensuite, exécutez le client :
+Ensuite, exécutez le client dans 2 terminaux différent :
 
 ```bash
 ./client
@@ -53,5 +53,5 @@ Les cases sont numérotées de cette manière :
  7 | 8 | 9
 ```
 
-Le joueur utilise le caractère X et l'ordinateur le O.
+Le premier joueurs utilise le caractère X et le second le O.
 Le premier à réaliser l'une des 8 combinaisons gagnantes remporte la partie.

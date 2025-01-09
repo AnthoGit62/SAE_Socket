@@ -31,9 +31,10 @@ void affiche(char grille[9]){
 	printf(" %c | %c | %c\n" , grille[3], grille[4], grille[5]);
 	printf("------------\n");
 	printf(" %c | %c | %c\n" , grille[6], grille[7], grille[8]);
+	printf("~~~~~~~~~~~~~~~~~~~~\n");
 }
 
-void prendre_case(char grille[9], char *messageRecu) {
+void prendre_case(char grille[9], char *messageRecu , char player) {
     int caseNum;
 
     sscanf(messageRecu, "%d", &caseNum);
@@ -41,31 +42,31 @@ void prendre_case(char grille[9], char *messageRecu) {
 	if(grille[caseNum - 1] == ' '){
 		switch (caseNum) {
 			case 1:  
-				grille[0] = 'X'; 
+				grille[0] = player; 
 				break;
 			case 2:  
-				grille[1] = 'X'; 
+				grille[1] = player; 
 				break;
 			case 3:  
-				grille[2] = 'X'; 
+				grille[2] = player; 
 				break;
 			case 4:  
-				grille[3] = 'X'; 
+				grille[3] = player; 
 				break ; 
 			case 5:  
-				grille[4] = 'X'; 
+				grille[4] = player; 
 				break;
 			case 6:  
-				grille[5] = 'X'; 
+				grille[5] = player; 
 				break;
 			case 7:  
-				grille[6] = 'X'; 
+				grille[6] = player; 
 				break;
 			case 8:  
-				grille[7] = 'X'; 
+				grille[7] = player; 
 				break;
 			case 9:  
-				grille[8] = 'X'; 
+				grille[8] = player; 
 				break;
 			default:
 				printf("Option invalide.\n");
@@ -139,35 +140,37 @@ char win(char grille[9])
 
 int main(int argc, char *argv[]){
 	int socketEcoute;
+	int socketDialogueCli1;
+	int socketDialogueCli2;
 
 	struct sockaddr_in pointDeRencontreLocal;
+	struct sockaddr_in pointDeRencontreDistant;
 	socklen_t longueurAdresse;
 
-	int socketDialogue;
-	struct sockaddr_in pointDeRencontreDistant;
-	char messageRecu[LG_MESSAGE]; /* le message de la couche Application ! */
+	char messageRecu[LG_MESSAGE];
 	char messageEnvoye[LG_MESSAGE];
-	int ecrits, lus; /* nb d’octets ecrits et lus */
-	int retour;
+
+	int ecrits, lus, retour ;
+	char winner ;
 
 	char grille[9] ;
 
 	// Crée un socket de communication
 	socketEcoute = socket(AF_INET, SOCK_STREAM, 0); 
+
 	// Teste la valeur renvoyée par l’appel système socket() 
 	if(socketEcoute < 0){
 		perror("socket"); // Affiche le message d’erreur 
-	exit(-1); // On sort en indiquant un code erreur
+		exit(-1); // On sort en indiquant un code erreur
 	}
-	printf("Socket créée avec succès ! (%d)\n", socketEcoute); // On prépare l’adresse d’attachement locale
-	//setsockopt()
-
+	printf("Socket créée avec succès ! (%d)\n", socketEcoute);
 
 	// Remplissage de sockaddrDistant (structure sockaddr_in identifiant le point d'écoute local)
 	longueurAdresse = sizeof(pointDeRencontreLocal);
-	// memset sert à faire une copie d'un octet n fois à partir d'une adresse mémoire donnée
-	// ici l'octet 0 est recopié longueurAdresse fois à partir de l'adresse &pointDeRencontreLocal
-	memset(&pointDeRencontreLocal, 0x00, longueurAdresse); pointDeRencontreLocal.sin_family = PF_INET;
+
+	memset(&pointDeRencontreLocal, 0x00, longueurAdresse); 
+
+	pointDeRencontreLocal.sin_family = PF_INET;
 	pointDeRencontreLocal.sin_addr.s_addr = htonl(INADDR_ANY); // attaché à toutes les interfaces locales disponibles
 	pointDeRencontreLocal.sin_port = htons(PORT); // = 5000 ou plus
 	
@@ -185,39 +188,77 @@ int main(int argc, char *argv[]){
 	}
 	printf("Socket placée en écoute passive ...\n");
 	
+	printf("En attente de deux connexions clients...\n");
+
 	// boucle d’attente de connexion : en théorie, un serveur attend indéfiniment ! 
 	while(1){
-		memset(messageRecu, 'a', LG_MESSAGE*sizeof(char));
+		//memset(messageRecu, 'a', LG_MESSAGE*sizeof(char));
 		printf("Attente d’une demande de connexion (quitter avec Ctrl-C)\n\n");
 		
-		// c’est un appel bloquant
-		socketDialogue = accept(socketEcoute, (struct sockaddr *)&pointDeRencontreDistant, &longueurAdresse);
-		if (socketDialogue < 0) {
-   			perror("accept");
-			close(socketDialogue);
-   			close(socketEcoute);
-   			exit(-4);
+		// Accepter la première connexion client
+		socketDialogueCli1 = accept(socketEcoute, (struct sockaddr *)&pointDeRencontreDistant, &longueurAdresse);
+		if (socketDialogueCli1 < 0) {
+			perror("accept (Client 1)");
+			close(socketEcoute);
+			exit(-4);
 		}
+		printf("Client 1 connecté !\n");
 
+		// Accepter la deuxième connexion client
+		socketDialogueCli2 = accept(socketEcoute, (struct sockaddr *)&pointDeRencontreDistant, &longueurAdresse);
+		if (socketDialogueCli2 < 0) {
+			perror("accept (Client 2)");
+			close(socketDialogueCli1);
+			close(socketEcoute);
+			exit(-5);
+		}
+		printf("Client 2 connecté !\n");
+
+		// Pour set la grille
 		init_grille(grille) ;
 		
+		// Boucle du jeu :
 		while (1){
+
+			//------------------------------ Joueur 1 -------------------------------
 
 			// Pour envoyer
 			memset(messageEnvoye, 0x00, LG_MESSAGE);
 			snprintf(messageEnvoye, LG_MESSAGE, "Numéro de la case que vous souhaitez prendre : (1 à 9) :");
-			ecrits = send(socketDialogue, messageEnvoye, strlen(messageEnvoye) + 1, 0);
+			ecrits = send(socketDialogueCli1, messageEnvoye, strlen(messageEnvoye) + 1, 0);
+			if (ecrits == 0) {
+				printf("Le client s'est déconnecté.\n");
+				break; // Sortir de la boucle et fermer le socket de dialogue
+        	} 
+			else if (ecrits < 0) {
+				perror("Erreur lors de la réception du message");
+				break; // Sortir de la boucle et fermer le socket de dialogue
+        	}
+
+			// Faire attendre le client 2
+			memset(messageEnvoye, 0x00, LG_MESSAGE);
+			snprintf(messageEnvoye, LG_MESSAGE, "Votre adversaire joue ...\n");
+			ecrits = send(socketDialogueCli2, messageEnvoye, strlen(messageEnvoye) + 1, 0);
+			if (ecrits == 0) {
+				printf("Le client s'est déconnecté.\n");
+				break; // Sortir de la boucle et fermer le socket de dialogue
+        	} 
+			else if (ecrits < 0) {
+				perror("Erreur lors de la réception du message");
+				break; // Sortir de la boucle et fermer le socket de dialogue
+        	}
 
 			// Pour recup
 			memset(messageRecu, 0x00, LG_MESSAGE);
-			lus = recv(socketDialogue, messageRecu, LG_MESSAGE, 0);
+			lus = recv(socketDialogueCli1, messageRecu, LG_MESSAGE, 0);
 
 			// On verifie , on claim la case et on envoie au joueur
 			if (lus > 0) {
 				printf("Message reçu : %s\n", messageRecu);
-				prendre_case(grille, messageRecu);
+				prendre_case(grille, messageRecu, 'X');
 				affiche(grille);
-				send(socketDialogue, grille, sizeof(grille), 0);
+				send(socketDialogueCli1, grille, sizeof(grille), 0);
+				send(socketDialogueCli2, grille, sizeof(grille), 0);
 			}
 			else if (lus == 0) {
 				printf("Le client s'est déconnecté.\n");
@@ -228,74 +269,126 @@ int main(int argc, char *argv[]){
 				break; // Sortir de la boucle et fermer le socket de dialogue
         	}
 
-			char winner = win(grille);
+			winner = win(grille);
 
-				if (winner == 'X')
-				{
-					memset(messageEnvoye, 0x00, LG_MESSAGE);
-					snprintf(messageEnvoye, LG_MESSAGE, "Client, vainqueur !\n");
-					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
-					break;
-				}
-				else if (winner == 'O')
-				{
-					memset(messageEnvoye, 0x00, LG_MESSAGE);
-					snprintf(messageEnvoye, LG_MESSAGE, "Bot, vainqueur !\n");
-					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
-					break;
-				}
-				else if (winner == 'R')
-				{
-					memset(messageEnvoye, 0x00, LG_MESSAGE);
-					snprintf(messageEnvoye, LG_MESSAGE, "Match nul !\n");
-					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
-					break;
-				}
-				else if (winner == 'C')
-				{
-					memset(messageEnvoye, 0x00, LG_MESSAGE);
-					snprintf(messageEnvoye, LG_MESSAGE, "Tours suivant :\n");
-					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
-				}
+			if (winner == 'X')
+			{
+				memset(messageEnvoye, 0x00, LG_MESSAGE);
+				snprintf(messageEnvoye, LG_MESSAGE, "Les X gagnent !\n");
+				send(socketDialogueCli1, messageEnvoye, LG_MESSAGE, 0);
+				send(socketDialogueCli2, messageEnvoye, LG_MESSAGE, 0);
+				break;
+			}
+			else if (winner == 'O')
+			{
+				memset(messageEnvoye, 0x00, LG_MESSAGE);
+				snprintf(messageEnvoye, LG_MESSAGE, "Les O gagnent !\n");
+				send(socketDialogueCli1, messageEnvoye, LG_MESSAGE, 0);
+				send(socketDialogueCli2, messageEnvoye, LG_MESSAGE, 0);
+				break;
+			}
+			else if (winner == 'R')
+			{
+				memset(messageEnvoye, 0x00, LG_MESSAGE);
+				snprintf(messageEnvoye, LG_MESSAGE, "Match nul !\n");
+				send(socketDialogueCli1, messageEnvoye, LG_MESSAGE, 0);
+				send(socketDialogueCli2, messageEnvoye, LG_MESSAGE, 0);
+				break;
+			}
+			else if (winner == 'C')
+			{
+				memset(messageEnvoye, 0x00, LG_MESSAGE);
+				snprintf(messageEnvoye, LG_MESSAGE, "Tours suivant :\n");
+				send(socketDialogueCli1, messageEnvoye, LG_MESSAGE, 0);
+				send(socketDialogueCli2, messageEnvoye, LG_MESSAGE, 0);
+			}
 
-			// au tour du serveur de jouer
-			bot_player(grille);
-			affiche(grille);
-			send(socketDialogue, grille, sizeof(grille), 0);
+			//------------------------------ Joueur 2 -------------------------------
+
+			// Pour envoyer
+			memset(messageEnvoye, 0x00, LG_MESSAGE);
+			snprintf(messageEnvoye, LG_MESSAGE, "Numéro de la case que vous souhaitez prendre : (1 à 9) :");
+			ecrits = send(socketDialogueCli2, messageEnvoye, strlen(messageEnvoye) + 1, 0);
+			if (ecrits == 0) {
+				printf("Le client s'est déconnecté.\n");
+				break; // Sortir de la boucle et fermer le socket de dialogue
+        	} 
+			else if (ecrits < 0) {
+				perror("Erreur lors de la réception du message");
+				break; // Sortir de la boucle et fermer le socket de dialogue
+        	}
+
+			// Faire attendre le client 1
+			memset(messageEnvoye, 0x00, LG_MESSAGE);
+			snprintf(messageEnvoye, LG_MESSAGE, "Votre adversaire joue ...\n");
+			ecrits = send(socketDialogueCli1, messageEnvoye, strlen(messageEnvoye) + 1, 0);
+			if (ecrits == 0) {
+				printf("Le client s'est déconnecté.\n");
+				break; // Sortir de la boucle et fermer le socket de dialogue
+        	} 
+			else if (ecrits < 0) {
+				perror("Erreur lors de la réception du message");
+				break; // Sortir de la boucle et fermer le socket de dialogue
+        	}
+
+			// Pour recup
+			memset(messageRecu, 0x00, LG_MESSAGE);
+			lus = recv(socketDialogueCli2, messageRecu, LG_MESSAGE, 0);
+
+			// On verifie , on claim la case et on envoie au joueur
+			if (lus > 0) {
+				printf("Message reçu : %s\n", messageRecu);
+				prendre_case(grille, messageRecu, 'O');
+				affiche(grille);
+				send(socketDialogueCli2, grille, sizeof(grille), 0);
+				send(socketDialogueCli1, grille, sizeof(grille), 0);
+			}
+			else if (lus == 0) {
+				printf("Le client s'est déconnecté.\n");
+				break; // Sortir de la boucle et fermer le socket de dialogue
+        	} 
+			else if (lus < 0) {
+				perror("Erreur lors de la réception du message");
+				break; // Sortir de la boucle et fermer le socket de dialogue
+        	}
 
 			winner = win(grille);
 
-				if (winner == 'X')
-				{
-					memset(messageEnvoye, 0x00, LG_MESSAGE);
-					snprintf(messageEnvoye, LG_MESSAGE, "Client, vainqueur !\n");
-					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
-					break;
-				}
-				else if (winner == 'O')
-				{
-					memset(messageEnvoye, 0x00, LG_MESSAGE);
-					snprintf(messageEnvoye, LG_MESSAGE, "Bot, vainqueur !\n");
-					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
-					break;
-				}
-				else if (winner == 'R')
-				{
-					memset(messageEnvoye, 0x00, LG_MESSAGE);
-					snprintf(messageEnvoye, LG_MESSAGE, "Match nul !\n");
-					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
-					break;
-				}
-				else if (winner == 'C')
-				{
-					memset(messageEnvoye, 0x00, LG_MESSAGE);
-					snprintf(messageEnvoye, LG_MESSAGE, "Tours suivant :\n");
-					send(socketDialogue, messageEnvoye, LG_MESSAGE, 0);
-				}
+			if (winner == 'X')
+			{
+				memset(messageEnvoye, 0x00, LG_MESSAGE);
+				snprintf(messageEnvoye, LG_MESSAGE, "Les X gagnent !\n");
+				send(socketDialogueCli1, messageEnvoye, LG_MESSAGE, 0);
+				send(socketDialogueCli2, messageEnvoye, LG_MESSAGE, 0);
+				break;
+			}
+			else if (winner == 'O')
+			{
+				memset(messageEnvoye, 0x00, LG_MESSAGE);
+				snprintf(messageEnvoye, LG_MESSAGE, "Les O gagnent !\n");
+				send(socketDialogueCli1, messageEnvoye, LG_MESSAGE, 0);
+				send(socketDialogueCli2, messageEnvoye, LG_MESSAGE, 0);
+				break;
+			}
+			else if (winner == 'R')
+			{
+				memset(messageEnvoye, 0x00, LG_MESSAGE);
+				snprintf(messageEnvoye, LG_MESSAGE, "Match nul !\n");
+				send(socketDialogueCli1, messageEnvoye, LG_MESSAGE, 0);
+				send(socketDialogueCli2, messageEnvoye, LG_MESSAGE, 0);
+				break;
+			}
+			else if (winner == 'C')
+			{
+				memset(messageEnvoye, 0x00, LG_MESSAGE);
+				snprintf(messageEnvoye, LG_MESSAGE, "Tours suivant :\n");
+				send(socketDialogueCli1, messageEnvoye, LG_MESSAGE, 0);
+				send(socketDialogueCli2, messageEnvoye, LG_MESSAGE, 0);
+			}
 		}
-
 	}
-	// On ferme la ressource avant de quitter
-   	close(socketEcoute);
+   	close(socketDialogueCli1);
+    close(socketDialogueCli2);
+    close(socketEcoute);
 	return 0; 
 }
