@@ -17,12 +17,14 @@
 #define PORT 5000
 #define LG_MESSAGE 256
 
+// Pour remplir la grille vide
 void init_grille(char grille[9]){
 	for(int i = 0 ; i < 9 ; i++){
 			grille[i] = ' ' ;
 		}
 }
 
+// Pour afficher la grille 
 void affiche(char grille[9]){
 	printf(" %c | %c | %c\n" , grille[0], grille[1], grille[2]);
 	printf("------------\n");
@@ -32,47 +34,27 @@ void affiche(char grille[9]){
 	printf("~~~~~~~~~~~~~~~~~~~~\n");
 }
 
-void prendre_case(char grille[9], char *messageRecu , char player) {
+// Pour claim une case
+void prendre_case(char grille[9], char *messageRecu, char player)
+{
     int caseNum;
 
     sscanf(messageRecu, "%d", &caseNum);
 
-	if(grille[caseNum - 1] == ' '){
-		switch (caseNum) {
-			case 1:  
-				grille[0] = player; 
-				break;
-			case 2:  
-				grille[1] = player; 
-				break;
-			case 3:  
-				grille[2] = player; 
-				break;
-			case 4:  
-				grille[3] = player; 
-				break ; 
-			case 5:  
-				grille[4] = player; 
-				break;
-			case 6:  
-				grille[5] = player; 
-				break;
-			case 7:  
-				grille[6] = player; 
-				break;
-			case 8:  
-				grille[7] = player; 
-				break;
-			case 9:  
-				grille[8] = player; 
-				break;
-			default:
-				printf("Option invalide.\n");
-				return;
-    	}
-	}
+    if (caseNum < 1 || caseNum > 9)
+    {
+        printf("Option invalide.\n");
+        return;
+    }
+
+    // Vérifie si la case est vide et met à jour la grille
+    if (grille[caseNum - 1] == ' ')
+    {
+        grille[caseNum - 1] = player;
+    }
 }
 
+// Fonction qui verifie si qq à gagné ou non
 char win(char grille[9])
 {
 	// Tableau des combinaisons gagnantes
@@ -111,6 +93,77 @@ char win(char grille[9])
 	return 'R'; // Match nul
 }
 
+// Fonction qui crée un socket de communication
+void create_socket(int *socketEcoute)
+{
+	// Crée un socket de communication
+	*socketEcoute = socket(AF_INET, SOCK_STREAM, 0);
+
+	if (*socketEcoute < 0)
+	{
+		perror("socket");
+		exit(-1);
+	}
+	printf("Socket créée avec succès ! (%d)\n", *socketEcoute);
+}
+
+// Fonction d'attente de connexion
+void attente(int socketEcoute, struct sockaddr_in *pointDeRencontreLocal)
+{
+	socklen_t longueurAdresse = sizeof(*pointDeRencontreLocal);
+
+	memset(pointDeRencontreLocal, 0x00, longueurAdresse);
+
+	pointDeRencontreLocal->sin_family = PF_INET;
+	pointDeRencontreLocal->sin_addr.s_addr = htonl(INADDR_ANY);
+	pointDeRencontreLocal->sin_port = htons(PORT);
+
+	if (bind(socketEcoute, (struct sockaddr *)pointDeRencontreLocal, longueurAdresse) < 0)
+	{
+		perror("bind");
+		exit(-2);
+	}
+	printf("Socket attachée avec succès !\n");
+
+	if (listen(socketEcoute, 5) < 0)
+	{
+		perror("listen");
+		exit(-3);
+	}
+	printf("Socket placée en écoute passive ...\n");
+
+	printf("En attente de connexions clients...\n");
+}
+
+// Fonction pour détecter les connexions client et spectateurs
+void detecte_connexion(int socketEcoute, int *socketDialogueCli1, int *socketDialogueCli2, struct sockaddr_in *pointDeRencontreDistant)
+{
+	socklen_t longueurAdresse = sizeof(*pointDeRencontreDistant);
+
+	printf("Attente d’une demande de connexion (quitter avec Ctrl-C)\n\n");
+
+	// Accepter la première connexion client
+	*socketDialogueCli1 = accept(socketEcoute, (struct sockaddr *)pointDeRencontreDistant, &longueurAdresse);
+	if (*socketDialogueCli1 < 0)
+	{
+		perror("accept (Client 1)");
+		close(socketEcoute);
+		exit(-4);
+	}
+	printf("Client 1 connecté !\n");
+
+	// Accepter la deuxième connexion client
+	*socketDialogueCli2 = accept(socketEcoute, (struct sockaddr *)pointDeRencontreDistant, &longueurAdresse);
+	if (*socketDialogueCli2 < 0)
+	{
+		perror("accept (Client 2)");
+		close(*socketDialogueCli1);
+		close(socketEcoute);
+		exit(-5);
+	}
+	printf("Client 2 connecté !\n");
+}
+
 int main(int argc, char *argv[]){
 	int socketEcoute;
 	int socketDialogueCli1;
@@ -123,7 +176,8 @@ int main(int argc, char *argv[]){
 	char messageRecu[LG_MESSAGE];
 	char messageEnvoye[LG_MESSAGE];
 
-	int ecrits, lus, retour, wait ;
+	int ecrits, lus, retour ;
+	int connect = 0 ;
 	char winner ;
 
 	int spectateurs[10];
@@ -131,88 +185,38 @@ int main(int argc, char *argv[]){
 
 	char grille[9] ;
 
-	// Crée un socket de communication
-	socketEcoute = socket(AF_INET, SOCK_STREAM, 0); 
-
-	// Teste la valeur renvoyée par l’appel système socket() 
-	if(socketEcoute < 0){
-		perror("socket"); // Affiche le message d’erreur 
-		exit(-1); // On sort en indiquant un code erreur
-	}
-	printf("Socket créée avec succès ! (%d)\n", socketEcoute);
-
-	// Remplissage de sockaddrDistant (structure sockaddr_in identifiant le point d'écoute local)
-	longueurAdresse = sizeof(pointDeRencontreLocal);
-
-	memset(&pointDeRencontreLocal, 0x00, longueurAdresse); 
-
-	pointDeRencontreLocal.sin_family = PF_INET;
-	pointDeRencontreLocal.sin_addr.s_addr = htonl(INADDR_ANY); // attaché à toutes les interfaces locales disponibles
-	pointDeRencontreLocal.sin_port = htons(PORT); // = 5000 ou plus
-	
-	// On demande l’attachement local de la socket
-	if((bind(socketEcoute, (struct sockaddr *)&pointDeRencontreLocal, longueurAdresse)) < 0) {
-		perror("bind");
-		exit(-2); 
-	}
-	printf("Socket attachée avec succès !\n");
-
-	// On fixe la taille de la file d’attente à 5 (pour les demandes de connexion non encore traitées)
-	if(listen(socketEcoute, 5) < 0){
-   		perror("listen");
-   		exit(-3);
-	}
-	printf("Socket placée en écoute passive ...\n");
-	
-	printf("En attente de deux connexions clients...\n");
+	create_socket(&socketEcoute);
+	attente(socketEcoute, &pointDeRencontreLocal);
 
 // boucle d’attente de connexion : en théorie, un serveur attend indéfiniment ! 
 	while(1){
 
-	//memset(messageRecu, 'a', LG_MESSAGE*sizeof(char));
-		printf("Attente d’une demande de connexion (quitter avec Ctrl-C)\n");
+	// Connections des participants a faire seulement lors de la premiere connection
+		if(connect == 0){
+		// Prendre toutes les connections
+			detecte_connexion(socketEcoute, &socketDialogueCli1, &socketDialogueCli2, &pointDeRencontreDistant);
+
+		// Cette boucle attend 5 secondes que des spectateurs se connectent
+			int wait = 0 ;
+
+			while (wait < 5) {
 		
-	// Accepter la première connexion client
-		socketDialogueCli1 = accept(socketEcoute, (struct sockaddr *)&pointDeRencontreDistant, &longueurAdresse);
-		if (socketDialogueCli1 < 0) {
-			perror("accept (Client 1)");
-			close(socketEcoute);
-			exit(-4);
-		}
-		printf("Client 1 connecté !\n");
-
-	// Accepter la deuxième connexion client
-		socketDialogueCli2 = accept(socketEcoute, (struct sockaddr *)&pointDeRencontreDistant, &longueurAdresse);
-		if (socketDialogueCli2 < 0) {
-			perror("accept (Client 2)");
-			close(socketDialogueCli2);
-			close(socketEcoute);
-			exit(-5);
-		}
-		printf("Client 2 connecté !\n");
-
-		wait = 0 ;
-
-	// Cette boucle attend 5 secondes que des spectateurs se connectent
-		while (wait < 5) {
-
-		// On attend 5 secondes que les spectateurs se connectent  
-			if (select(socketEcoute + 1, &(fd_set){{1U << socketEcoute}}, NULL, NULL, &(struct timeval){5, 0}) > 0) {
-				if(nb_spectateurs < 9){
-					spectateurs[nb_spectateurs] = accept(socketEcoute, (struct sockaddr *)&pointDeRencontreDistant, &longueurAdresse);
-					if (spectateurs[nb_spectateurs] >= 0) {
-						printf("Spectateur connecté !\n");
-						nb_spectateurs++ ;
-					} else {
-						perror("accept (spectateur)");
+				if (select(socketEcoute + 1, &(fd_set){{1U << socketEcoute}}, NULL, NULL, &(struct timeval){5, 0}) > 0) {
+					if(nb_spectateurs < 9){
+						spectateurs[nb_spectateurs] = accept(socketEcoute, (struct sockaddr *)&pointDeRencontreDistant, &longueurAdresse);
+						if (spectateurs[nb_spectateurs] >= 0) {
+							printf("Spectateur connecté !\n");
+							nb_spectateurs++ ;
+						} else {
+							perror("accept (spectateur)");
+						}
 					}
-				}
-			} 
-
-			// Je ne fait le test que tt les secondes pour ne pas abuser sur les calculs
-			sleep(1);
-			wait ++ ;
-			printf("attente ...%d\n", wait);
+				} 
+				// Je ne fait le test que tt les secondes pour ne pas abuser sur les calculs
+				sleep(1);
+				wait ++ ;
+				printf("attente ...%d\n", wait);
+			}
 		}
 
 	// Pour set la grille vide en début de partie
@@ -253,7 +257,7 @@ int main(int argc, char *argv[]){
 
 		// Envoyer un message au spectateur 
 			memset(messageEnvoye, 0x00, LG_MESSAGE);
-			snprintf(messageEnvoye, LG_MESSAGE, "A\n");
+			snprintf(messageEnvoye, LG_MESSAGE, "Les X jouent :\n");
 			for (int i = 0; i < nb_spectateurs; i++){
 				send(spectateurs[i], messageEnvoye, LG_MESSAGE, 0);
 			}	
@@ -360,7 +364,7 @@ int main(int argc, char *argv[]){
 
 		// Envoyer un message au spectateur 
 			memset(messageEnvoye, 0x00, LG_MESSAGE);
-			snprintf(messageEnvoye, LG_MESSAGE, "A\n");
+			snprintf(messageEnvoye, LG_MESSAGE, "Les O jouent :\n");
 			for (int i = 0; i < nb_spectateurs; i++){
 				send(spectateurs[i], messageEnvoye, LG_MESSAGE, 0);
 			}
@@ -435,6 +439,15 @@ int main(int argc, char *argv[]){
 				}
 			}
 		}
+		memset(messageEnvoye, 0x00, LG_MESSAGE);
+		snprintf(messageEnvoye, LG_MESSAGE, "\n\nLa partie va redémarrer !\n\n");
+		send(socketDialogueCli1, messageEnvoye, LG_MESSAGE, 0);
+		send(socketDialogueCli2, messageEnvoye, LG_MESSAGE, 0);
+		for (int i = 0; i < nb_spectateurs; i++){
+			send(spectateurs[i], messageEnvoye, LG_MESSAGE, 0);
+		}
+
+		connect ++ ;
 	}
    	close(socketDialogueCli1);
     close(socketDialogueCli2);

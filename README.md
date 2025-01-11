@@ -31,7 +31,7 @@ Exécutez d'abord le serveur dans un terminal ou un compilateur dédié :
 ./serveur
 ```
 
-Ensuite, exécutez le client dans 2 terminaux différent :
+Ensuite, exécutez les clients et les spectateurs dans 2 terminaux différent :
 
 ```bash
 ./client
@@ -40,8 +40,8 @@ Ensuite, exécutez le client dans 2 terminaux différent :
 ### 3. Jouer :
 
 Le jeu se lance directement sur une partie.
-À la fin de votre partie, vous avez le choix entre quitter le jeu ou recommencer une partie.
-Pour quitter, il vous suffit d'utiliser Ctrl + C pendant une partie ou de l’indiquer à la fin de celle-ci.
+À la fin de votre partie, une nouvelle se lance automatiquement.
+Pour quitter, il vous suffit d'utiliser Ctrl + C.
 
 Les cases sont numérotées de cette manière :
 
@@ -54,4 +54,5 @@ Les cases sont numérotées de cette manière :
 ```
 
 Le premier joueurs utilise le caractère X et le second le O.
+Une fois les deux joueurs connectés, vous disposez de 5secondes pour connecter jusqu'à 9 spectateurs.
 Le premier à réaliser l'une des 8 combinaisons gagnantes remporte la partie.
