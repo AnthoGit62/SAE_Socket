@@ -12,10 +12,9 @@
 #include <string.h> /* pour memset */
 #include <netinet/in.h> /* pour struct sockaddr_in */
 #include <arpa/inet.h> /* pour htons et inet_aton */
-#include <time.h>
+#include <unistd.h> // Pour la fonction sleep()
 
-#define PORT 5000 //(ports >= 5000 réservés pour usage explicite)
-
+#define PORT 5000
 #define LG_MESSAGE 256
 
 void init_grille(char grille[9]){
@@ -25,7 +24,6 @@ void init_grille(char grille[9]){
 }
 
 void affiche(char grille[9]){
-	printf("~~~~~~~~~~~~~~~~~~~~\n");
 	printf(" %c | %c | %c\n" , grille[0], grille[1], grille[2]);
 	printf("------------\n");
 	printf(" %c | %c | %c\n" , grille[3], grille[4], grille[5]);
@@ -75,30 +73,6 @@ void prendre_case(char grille[9], char *messageRecu , char player) {
 	}
 }
 
-int bot_player(char grille[9]) {
-	int cases_vides[9];
-    int total = 0;
-
-    for (int i = 0 ; i < 9 ; i++) {
-        if (grille[i] == ' ') {
-            cases_vides[total] = i ;
-            total++;
-        }
-    }
-
-    if (total == 0) {
-        printf("Pas de cases vides disponibles.\n");
-        return 0;
-    }
-	else {
-    	srand(time(NULL));
-
-    	int choix = cases_vides[rand() % total];
-
-    	grille[choix] = 'O';
-	}
-}
-
 char win(char grille[9])
 {
 	// Tableau des combinaisons gagnantes
@@ -137,7 +111,6 @@ char win(char grille[9])
 	return 'R'; // Match nul
 }
 
-
 int main(int argc, char *argv[]){
 	int socketEcoute;
 	int socketDialogueCli1;
@@ -150,8 +123,11 @@ int main(int argc, char *argv[]){
 	char messageRecu[LG_MESSAGE];
 	char messageEnvoye[LG_MESSAGE];
 
-	int ecrits, lus, retour ;
+	int ecrits, lus, retour, wait ;
 	char winner ;
+
+	int spectateurs[10];
+	int nb_spectateurs = 0;
 
 	char grille[9] ;
 
@@ -190,12 +166,13 @@ int main(int argc, char *argv[]){
 	
 	printf("En attente de deux connexions clients...\n");
 
-	// boucle d’attente de connexion : en théorie, un serveur attend indéfiniment ! 
+// boucle d’attente de connexion : en théorie, un serveur attend indéfiniment ! 
 	while(1){
-		//memset(messageRecu, 'a', LG_MESSAGE*sizeof(char));
-		printf("Attente d’une demande de connexion (quitter avec Ctrl-C)\n\n");
+
+	//memset(messageRecu, 'a', LG_MESSAGE*sizeof(char));
+		printf("Attente d’une demande de connexion (quitter avec Ctrl-C)\n");
 		
-		// Accepter la première connexion client
+	// Accepter la première connexion client
 		socketDialogueCli1 = accept(socketEcoute, (struct sockaddr *)&pointDeRencontreDistant, &longueurAdresse);
 		if (socketDialogueCli1 < 0) {
 			perror("accept (Client 1)");
@@ -204,28 +181,53 @@ int main(int argc, char *argv[]){
 		}
 		printf("Client 1 connecté !\n");
 
-		// Accepter la deuxième connexion client
+	// Accepter la deuxième connexion client
 		socketDialogueCli2 = accept(socketEcoute, (struct sockaddr *)&pointDeRencontreDistant, &longueurAdresse);
 		if (socketDialogueCli2 < 0) {
 			perror("accept (Client 2)");
-			close(socketDialogueCli1);
+			close(socketDialogueCli2);
 			close(socketEcoute);
 			exit(-5);
 		}
 		printf("Client 2 connecté !\n");
 
-		// Pour set la grille
+		wait = 0 ;
+
+	// Cette boucle attend 5 secondes que des spectateurs se connectent
+		while (wait < 5) {
+
+		// On attend 5 secondes que les spectateurs se connectent  
+			if (select(socketEcoute + 1, &(fd_set){{1U << socketEcoute}}, NULL, NULL, &(struct timeval){5, 0}) > 0) {
+				if(nb_spectateurs < 9){
+					spectateurs[nb_spectateurs] = accept(socketEcoute, (struct sockaddr *)&pointDeRencontreDistant, &longueurAdresse);
+					if (spectateurs[nb_spectateurs] >= 0) {
+						printf("Spectateur connecté !\n");
+						nb_spectateurs++ ;
+					} else {
+						perror("accept (spectateur)");
+					}
+				}
+			} 
+
+			// Je ne fait le test que tt les secondes pour ne pas abuser sur les calculs
+			sleep(1);
+			wait ++ ;
+			printf("attente ...%d\n", wait);
+		}
+
+	// Pour set la grille vide en début de partie
 		init_grille(grille) ;
 		
-		// Boucle du jeu :
+	// Boucle du jeu :
 		while (1){
 
-			//------------------------------ Joueur 1 -------------------------------
+		//--------------------------------------------- Joueur 1 ---------------------------------------------
 
-			// Pour envoyer
+		// Parler au client 1
 			memset(messageEnvoye, 0x00, LG_MESSAGE);
 			snprintf(messageEnvoye, LG_MESSAGE, "Numéro de la case que vous souhaitez prendre : (1 à 9) :");
 			ecrits = send(socketDialogueCli1, messageEnvoye, strlen(messageEnvoye) + 1, 0);
+
 			if (ecrits == 0) {
 				printf("Le client s'est déconnecté.\n");
 				break; // Sortir de la boucle et fermer le socket de dialogue
@@ -235,10 +237,11 @@ int main(int argc, char *argv[]){
 				break; // Sortir de la boucle et fermer le socket de dialogue
         	}
 
-			// Faire attendre le client 2
+		// Faire attendre le client 2
 			memset(messageEnvoye, 0x00, LG_MESSAGE);
 			snprintf(messageEnvoye, LG_MESSAGE, "Votre adversaire joue ...\n");
 			ecrits = send(socketDialogueCli2, messageEnvoye, strlen(messageEnvoye) + 1, 0);
+
 			if (ecrits == 0) {
 				printf("Le client s'est déconnecté.\n");
 				break; // Sortir de la boucle et fermer le socket de dialogue
@@ -248,27 +251,37 @@ int main(int argc, char *argv[]){
 				break; // Sortir de la boucle et fermer le socket de dialogue
         	}
 
-			// Pour recup
+		// Envoyer un message au spectateur 
+			memset(messageEnvoye, 0x00, LG_MESSAGE);
+			snprintf(messageEnvoye, LG_MESSAGE, "A\n");
+			for (int i = 0; i < nb_spectateurs; i++){
+				send(spectateurs[i], messageEnvoye, LG_MESSAGE, 0);
+			}	
+
+		// Choix du client 1
 			memset(messageRecu, 0x00, LG_MESSAGE);
 			lus = recv(socketDialogueCli1, messageRecu, LG_MESSAGE, 0);
 
-			// On verifie , on claim la case et on envoie au joueur
+		// On verifie , on claim la case et on envoie au joueurs + specs
 			if (lus > 0) {
-				printf("Message reçu : %s\n", messageRecu);
 				prendre_case(grille, messageRecu, 'X');
 				affiche(grille);
 				send(socketDialogueCli1, grille, sizeof(grille), 0);
 				send(socketDialogueCli2, grille, sizeof(grille), 0);
+				for (int i = 0; i < nb_spectateurs; i++){
+					send(spectateurs[i], grille, sizeof(grille), 0);
+				}
 			}
 			else if (lus == 0) {
-				printf("Le client s'est déconnecté.\n");
-				break; // Sortir de la boucle et fermer le socket de dialogue
+				printf("Le client 1 s'est déconnecté.\n");
+				break;
         	} 
 			else if (lus < 0) {
 				perror("Erreur lors de la réception du message");
-				break; // Sortir de la boucle et fermer le socket de dialogue
+				break;
         	}
 
+		// On verifie si un joueurs à gagné et on envoie l'avancé a tout le monde
 			winner = win(grille);
 
 			if (winner == 'X')
@@ -277,6 +290,9 @@ int main(int argc, char *argv[]){
 				snprintf(messageEnvoye, LG_MESSAGE, "Les X gagnent !\n");
 				send(socketDialogueCli1, messageEnvoye, LG_MESSAGE, 0);
 				send(socketDialogueCli2, messageEnvoye, LG_MESSAGE, 0);
+				for (int i = 0; i < nb_spectateurs; i++){
+					send(spectateurs[i], messageEnvoye, LG_MESSAGE, 0);
+				}
 				break;
 			}
 			else if (winner == 'O')
@@ -285,6 +301,9 @@ int main(int argc, char *argv[]){
 				snprintf(messageEnvoye, LG_MESSAGE, "Les O gagnent !\n");
 				send(socketDialogueCli1, messageEnvoye, LG_MESSAGE, 0);
 				send(socketDialogueCli2, messageEnvoye, LG_MESSAGE, 0);
+				for (int i = 0; i < nb_spectateurs; i++){
+					send(spectateurs[i], messageEnvoye, LG_MESSAGE, 0);
+				}
 				break;
 			}
 			else if (winner == 'R')
@@ -293,6 +312,9 @@ int main(int argc, char *argv[]){
 				snprintf(messageEnvoye, LG_MESSAGE, "Match nul !\n");
 				send(socketDialogueCli1, messageEnvoye, LG_MESSAGE, 0);
 				send(socketDialogueCli2, messageEnvoye, LG_MESSAGE, 0);
+				for (int i = 0; i < nb_spectateurs; i++){
+					send(spectateurs[i], messageEnvoye, LG_MESSAGE, 0);
+				}
 				break;
 			}
 			else if (winner == 'C')
@@ -301,14 +323,18 @@ int main(int argc, char *argv[]){
 				snprintf(messageEnvoye, LG_MESSAGE, "Tours suivant :\n");
 				send(socketDialogueCli1, messageEnvoye, LG_MESSAGE, 0);
 				send(socketDialogueCli2, messageEnvoye, LG_MESSAGE, 0);
+				for (int i = 0; i < nb_spectateurs; i++){
+					send(spectateurs[i], messageEnvoye, LG_MESSAGE, 0);
+				}
 			}
 
-			//------------------------------ Joueur 2 -------------------------------
+	//--------------------------------------------- Joueur 2 ---------------------------------------------
 
-			// Pour envoyer
+		// Pour parler au client 2
 			memset(messageEnvoye, 0x00, LG_MESSAGE);
 			snprintf(messageEnvoye, LG_MESSAGE, "Numéro de la case que vous souhaitez prendre : (1 à 9) :");
 			ecrits = send(socketDialogueCli2, messageEnvoye, strlen(messageEnvoye) + 1, 0);
+
 			if (ecrits == 0) {
 				printf("Le client s'est déconnecté.\n");
 				break; // Sortir de la boucle et fermer le socket de dialogue
@@ -318,10 +344,11 @@ int main(int argc, char *argv[]){
 				break; // Sortir de la boucle et fermer le socket de dialogue
         	}
 
-			// Faire attendre le client 1
+		// Faire attendre le client 1
 			memset(messageEnvoye, 0x00, LG_MESSAGE);
 			snprintf(messageEnvoye, LG_MESSAGE, "Votre adversaire joue ...\n");
 			ecrits = send(socketDialogueCli1, messageEnvoye, strlen(messageEnvoye) + 1, 0);
+
 			if (ecrits == 0) {
 				printf("Le client s'est déconnecté.\n");
 				break; // Sortir de la boucle et fermer le socket de dialogue
@@ -331,27 +358,37 @@ int main(int argc, char *argv[]){
 				break; // Sortir de la boucle et fermer le socket de dialogue
         	}
 
-			// Pour recup
+		// Envoyer un message au spectateur 
+			memset(messageEnvoye, 0x00, LG_MESSAGE);
+			snprintf(messageEnvoye, LG_MESSAGE, "A\n");
+			for (int i = 0; i < nb_spectateurs; i++){
+				send(spectateurs[i], messageEnvoye, LG_MESSAGE, 0);
+			}
+
+		// Choix du client 2
 			memset(messageRecu, 0x00, LG_MESSAGE);
 			lus = recv(socketDialogueCli2, messageRecu, LG_MESSAGE, 0);
 
-			// On verifie , on claim la case et on envoie au joueur
+		// On verifie , on claim la case et on envoie au joueur
 			if (lus > 0) {
-				printf("Message reçu : %s\n", messageRecu);
 				prendre_case(grille, messageRecu, 'O');
 				affiche(grille);
 				send(socketDialogueCli2, grille, sizeof(grille), 0);
 				send(socketDialogueCli1, grille, sizeof(grille), 0);
+				for (int i = 0; i < nb_spectateurs; i++){
+					send(spectateurs[i], grille, sizeof(grille), 0);
+				}
 			}
 			else if (lus == 0) {
 				printf("Le client s'est déconnecté.\n");
-				break; // Sortir de la boucle et fermer le socket de dialogue
+				break;
         	} 
 			else if (lus < 0) {
 				perror("Erreur lors de la réception du message");
-				break; // Sortir de la boucle et fermer le socket de dialogue
+				break;
         	}
 
+		// On verifie si un joueurs à gagné et on envoie l'avancé a tout le monde
 			winner = win(grille);
 
 			if (winner == 'X')
@@ -360,6 +397,9 @@ int main(int argc, char *argv[]){
 				snprintf(messageEnvoye, LG_MESSAGE, "Les X gagnent !\n");
 				send(socketDialogueCli1, messageEnvoye, LG_MESSAGE, 0);
 				send(socketDialogueCli2, messageEnvoye, LG_MESSAGE, 0);
+				for (int i = 0; i < nb_spectateurs; i++){
+					send(spectateurs[i], messageEnvoye, LG_MESSAGE, 0);
+				}
 				break;
 			}
 			else if (winner == 'O')
@@ -368,6 +408,9 @@ int main(int argc, char *argv[]){
 				snprintf(messageEnvoye, LG_MESSAGE, "Les O gagnent !\n");
 				send(socketDialogueCli1, messageEnvoye, LG_MESSAGE, 0);
 				send(socketDialogueCli2, messageEnvoye, LG_MESSAGE, 0);
+				for (int i = 0; i < nb_spectateurs; i++){
+					send(spectateurs[i], messageEnvoye, LG_MESSAGE, 0);
+				}
 				break;
 			}
 			else if (winner == 'R')
@@ -376,6 +419,9 @@ int main(int argc, char *argv[]){
 				snprintf(messageEnvoye, LG_MESSAGE, "Match nul !\n");
 				send(socketDialogueCli1, messageEnvoye, LG_MESSAGE, 0);
 				send(socketDialogueCli2, messageEnvoye, LG_MESSAGE, 0);
+				for (int i = 0; i < nb_spectateurs; i++){
+					send(spectateurs[i], messageEnvoye, LG_MESSAGE, 0);
+				}
 				break;
 			}
 			else if (winner == 'C')
@@ -384,6 +430,9 @@ int main(int argc, char *argv[]){
 				snprintf(messageEnvoye, LG_MESSAGE, "Tours suivant :\n");
 				send(socketDialogueCli1, messageEnvoye, LG_MESSAGE, 0);
 				send(socketDialogueCli2, messageEnvoye, LG_MESSAGE, 0);
+				for (int i = 0; i < nb_spectateurs; i++){
+					send(spectateurs[i], messageEnvoye, LG_MESSAGE, 0);
+				}
 			}
 		}
 	}
