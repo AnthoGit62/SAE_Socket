@@ -42,47 +42,23 @@ void affiche(char grille[9])
 // Claim une case
 void prendre_case(char grille[9], char *messageRecu, char player)
 {
-	int caseNum;
+    int caseNum;
 
-	sscanf(messageRecu, "%d", &caseNum);
+    sscanf(messageRecu, "%d", &caseNum);
 
-	if (grille[caseNum - 1] == ' ')
-	{
-		switch (caseNum)
-		{
-		case 1:
-			grille[0] = player;
-			break;
-		case 2:
-			grille[1] = player;
-			break;
-		case 3:
-			grille[2] = player;
-			break;
-		case 4:
-			grille[3] = player;
-			break;
-		case 5:
-			grille[4] = player;
-			break;
-		case 6:
-			grille[5] = player;
-			break;
-		case 7:
-			grille[6] = player;
-			break;
-		case 8:
-			grille[7] = player;
-			break;
-		case 9:
-			grille[8] = player;
-			break;
-		default:
-			printf("Option invalide.\n");
-			return;
-		}
-	}
+    if (caseNum < 1 || caseNum > 9)
+    {
+        printf("Option invalide.\n");
+        return;
+    }
+
+    // Vérifie si la case est vide et met à jour la grille
+    if (grille[caseNum - 1] == ' ')
+    {
+        grille[caseNum - 1] = player;
+    }
 }
+
 
 // Fonction de jeu automatique
 int bot_player(char grille[9])
