@@ -1,4 +1,4 @@
-# DOC du projet T3N Socket V2
+# DOC du projet T3N Socket V3
 
 #### Par PREVOST Louis & SEYS Anthony & LIM Julie
 
@@ -31,7 +31,7 @@ Exécutez d'abord le serveur dans un terminal ou un compilateur dédié :
 ./serveur
 ```
 
-Ensuite, exécutez les clients et les spectateurs dans 2 terminaux différent :
+Ensuite, exécutez les clients et les spectateurs dans des terminaux différent :
 
 ```bash
 ./client
