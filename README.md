@@ -10,7 +10,7 @@
 
 - **SEYS Anthony** [@Anthony](https://github.com/AnthoGit62)
 - **PREVOST Louis** [@Louis Prévost](https://github.com/louisprvst)
-- **LIM Julie** [@Louis Prévost](https://github.com/louisprvst)
+- **LIM Julie** 
 
 ---
 
